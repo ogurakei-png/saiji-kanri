@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>祭事 獲得数管理</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Hiragino Sans', 'Meiryo', sans-serif; background: #f0f2f8; color: #333; font-size: 14px; }
+
+header {
+  background: linear-gradient(135deg, #1a237e, #3949ab);
+  color: white; padding: 14px 24px;
+  display: flex; align-items: center; gap: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+header h1 { font-size: 1.15rem; font-weight: 700; }
+
+/* ===== 共通フィルターバー ===== */
+.global-filter {
+  background: white;
+  border-bottom: 1px solid #dde;
+  padding: 10px 24px;
+  display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  position: sticky; top: 0; z-index: 100;
+}
+.gf-group { display: flex; flex-direction: column; gap: 3px; }
+.gf-group label { font-size: 0.72rem; color: #888; font-weight: 600; }
+.gf-group select, .gf-group input {
+  padding: 6px 10px; border: 1.5px solid #ddd; border-radius: 7px;
+  font-size: 0.82rem; font-family: inherit; outline: none; min-width: 110px;
+}
+.gf-group input { min-width: 160px; }
+.gf-group select:focus, .gf-group input:focus { border-color: #3949ab; }
+.btn-reset { padding: 6px 14px; border: none; border-radius: 7px; cursor: pointer; font-size: 0.8rem; font-weight: 700; background: #e8eaf6; color: #3949ab; align-self: flex-end; }
+.btn-reset:hover { background: #c5cae9; }
+.filter-count { font-size: 0.78rem; color: #999; align-self: flex-end; padding-bottom: 2px; }
+
+.container { max-width: 1200px; margin: 0 auto; padding: 16px 16px; }
+
+.tabs { display: flex; gap: 6px; margin-bottom: 0; flex-wrap: wrap; }
+.tab {
+  padding: 9px 18px; border: none; border-radius: 8px 8px 0 0;
+  cursor: pointer; font-size: 0.88rem; font-weight: 600;
+  background: #c8cde6; color: #555; transition: all 0.2s;
+}
+.tab.active { background: white; color: #1a237e; }
+
+.panel { background: white; border-radius: 0 12px 12px 12px; padding: 22px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); display: none; }
+.panel.active { display: block; }
+
+h2 { font-size: 1rem; color: #1a237e; margin-bottom: 14px; font-weight: 700; border-left: 4px solid #3949ab; padding-left: 10px; }
+h3 { font-size: 0.9rem; color: #3949ab; margin: 18px 0 10px; font-weight: 700; }
+
+.upload-area {
+  border: 2px dashed #9fa8da; border-radius: 12px;
+  padding: 36px; text-align: center; cursor: pointer;
+  transition: all 0.2s; background: #f8f9ff; margin-bottom: 16px;
+}
+.upload-area:hover, .upload-area.dragover { border-color: #3949ab; background: #e8eaf6; }
+.upload-area .icon { font-size: 2.4rem; margin-bottom: 8px; }
+.upload-area p { color: #666; font-size: 0.9rem; }
+.upload-area input[type=file] { display: none; }
+
+.format-hint {
+  background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 8px;
+  padding: 12px 16px; font-size: 0.82rem; color: #2e7d32; margin-bottom: 16px;
+}
+.format-hint code { background: #c8e6c9; padding: 1px 5px; border-radius: 3px; font-size: 0.8rem; }
+
+select, input {
+  padding: 7px 10px; border: 1.5px solid #ddd; border-radius: 7px;
+  font-size: 0.85rem; font-family: inherit; outline: none; transition: border 0.2s; background: white;
+}
+select:focus, input:focus { border-color: #3949ab; }
+label { font-size: 0.78rem; color: #666; font-weight: 600; }
+.form-group { display: flex; flex-direction: column; gap: 3px; }
+.row-flex { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
+
+.btn { padding: 8px 18px; border: none; border-radius: 7px; cursor: pointer; font-size: 0.85rem; font-weight: 700; transition: all 0.2s; }
+.btn-primary { background: #3949ab; color: white; }
+.btn-primary:hover { background: #1a237e; }
+.btn-secondary { background: #e8eaf6; color: #3949ab; }
+.btn-secondary:hover { background: #c5cae9; }
+.btn-danger { background: #ef5350; color: white; }
+.btn-danger:hover { background: #c62828; }
+.btn-sm { padding: 5px 12px; font-size: 0.78rem; }
+
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.stat-card {
+  background: linear-gradient(135deg, #e8eaf6, #fff);
+  border: 1.5px solid #c5cae9; border-radius: 10px; padding: 13px; text-align: center;
+}
+.stat-card .slabel { font-size: 0.72rem; color: #888; margin-bottom: 5px; }
+.stat-card .svalue { font-size: 1.4rem; font-weight: 800; color: #1a237e; }
+.stat-card .ssub { font-size: 0.7rem; color: #aaa; margin-top: 2px; }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.82rem; min-width: 500px; }
+th { background: #e8eaf6; color: #1a237e; padding: 9px 10px; text-align: left; font-weight: 700; white-space: nowrap; }
+td { padding: 7px 10px; border-bottom: 1px solid #f0f0f0; white-space: nowrap; }
+tr:hover td { background: #fafbff; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; background: #e8eaf6; color: #3949ab; }
+.badge-green { background: #e8f5e9; color: #2e7d32; }
+.badge-orange { background: #fff3e0; color: #e65100; }
+
+/* テーブル行内プルダウン */
+.row-drill { padding: 4px 8px; border: 1px solid #c5cae9; border-radius: 5px; font-size: 0.78rem; background: #f0f4ff; color: #3949ab; cursor: pointer; }
+.row-drill:hover { background: #e8eaf6; }
+
+.chart-wrap { position: relative; height: 300px; margin: 10px 0 20px; }
+.chart-wrap-lg { height: 360px; }
+.sep { border: none; border-top: 1px solid #eee; margin: 20px 0; }
+.empty { text-align: center; color: #bbb; padding: 36px; }
+
+
+.highlight { color: #e53935; font-weight: 700; }
+.good { color: #2e7d32; font-weight: 700; }
+
+/* 平日/休日カード */
+.daycat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+.daycat-card { border-radius: 10px; padding: 14px; border: 1.5px solid; }
+.daycat-card.weekday { background: #e3f2fd; border-color: #90caf9; }
+.daycat-card.holiday { background: #fce4ec; border-color: #f48fb1; }
+.daycat-card h4 { font-size: 0.85rem; margin-bottom: 10px; }
+.daycat-stat { display: flex; justify-content: space-between; font-size: 0.82rem; padding: 3px 0; border-bottom: 1px solid rgba(0,0,0,0.06); }
+.daycat-stat:last-child { border-bottom: none; }
+.daycat-val { font-weight: 700; }
+</style>
+</head>
+<body>
+
+<header>
+  <span style="font-size:1.5rem">🏮</span>
+  <h1>祭事 獲得数管理システム</h1>
+</header>
+
+<!-- 共通フィルターバー -->
+<div class="global-filter">
+  <div class="gf-group"><label>🔍 フリー検索</label><input id="gf-search" type="text" placeholder="企画・エリア・ロケーション…" oninput="applyGlobalFilter()"></div>
+  <div class="gf-group"><label>企画</label><select id="gf-event" onchange="applyGlobalFilter()"><option value="">すべて</option></select></div>
+  <div class="gf-group"><label>エリア</label><select id="gf-area" onchange="applyGlobalFilter()"><option value="">すべて</option></select></div>
+  <div class="gf-group"><label>ロケーション</label><select id="gf-loc" onchange="applyGlobalFilter()"><option value="">すべて</option></select></div>
+  <div class="gf-group"><label>日カテゴリ</label><select id="gf-daycat" onchange="applyGlobalFilter()"><option value="">すべて</option></select></div>
+  <div class="gf-group"><label>曜日</label><select id="gf-dow" onchange="applyGlobalFilter()"><option value="">すべて</option></select></div>
+  <button class="btn-reset" onclick="resetGlobalFilter()">リセット</button>
+  <span class="filter-count" id="gf-count"></span>
+</div>
+
+<div class="container">
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('upload')">📂 CSVインポート</button>
+    <button class="tab" onclick="switchTab('list')">📋 一覧</button>
+    <button class="tab" onclick="switchTab('analytics')">📊 集計・グラフ</button>
+  </div>
+
+  <!-- CSVインポート -->
+  <div class="panel active" id="tab-upload">
+    <h2>CSVファイルをインポート</h2>
+    <div class="format-hint">
+      📋 対応フォーマット（1行目はヘッダー）：<br>
+      <code>企画</code>　<code>日付</code>　<code>曜日</code>　<code>日カテゴリ</code>　<code>エリア</code>　<code>ロケーション</code>　<code>内ロケ</code>　<code>稼働人数</code>　<code>獲得数</code>　<code>個人Ave</code><br>
+      ※ タブ区切り・カンマ区切りどちらも対応。個人Aveはアプリ側で再計算します。
+    </div>
+    <div class="upload-area" id="drop-zone" onclick="document.getElementById('csv-file').click()">
+      <div class="icon">📁</div>
+      <p>クリックまたはドラッグ＆ドロップでCSVを選択</p>
+      <p style="font-size:0.78rem;color:#aaa;margin-top:6px">.csv / .tsv / .txt 対応</p>
+      <input type="file" id="csv-file" accept=".csv,.tsv,.txt" onchange="loadCSV(this.files[0])">
+    </div>
+    <div id="import-msg"></div>
+    <div id="import-preview"></div>
+    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-secondary" onclick="downloadSample()">📥 サンプルCSVをダウンロード</button>
+      <button class="btn btn-danger btn-sm" onclick="clearAll()">🗑 全データ削除</button>
+    </div>
+    <p style="font-size:0.78rem;color:#aaa;margin-top:8px">現在のデータ数: <strong id="data-count">0</strong> 件</p>
+  </div>
+
+  <!-- 一覧 -->
+  <div class="panel" id="tab-list">
+    <h2>データ一覧</h2>
+    <div id="list-body"></div>
+  </div>
+
+  <!-- 集計 -->
+  <div class="panel" id="tab-analytics">
+    <h2>集計・グラフ</h2>
+    <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap">
+      <div class="form-group">
+        <label>エリアで絞込</label>
+        <select id="a-area-filter" onchange="renderAnalytics()">
+          <option value="">すべて</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="stats-grid" id="a-stats"></div>
+    <hr class="sep">
+    <h3>個人Ave</h3>
+    <div class="chart-wrap"><canvas id="chart-avg"></canvas></div>
+    <hr class="sep">
+    <h3>合計獲得数</h3>
+    <div class="chart-wrap"><canvas id="chart-total"></canvas></div>
+    <hr class="sep">
+    <h3>稼働人数 vs 獲得数</h3>
+    <div class="chart-wrap"><canvas id="chart-staff"></canvas></div>
+    <hr class="sep">
+    <h3>詳細テーブル <span style="font-size:0.78rem;color:#999;font-weight:400">― 行のプルダウンで絞り込み再集計</span></h3>
+    <div class="table-wrap" id="a-table"></div>
+  </div>
+
+</div>
+
+<script>
+let records = JSON.parse(localStorage.getItem('saiji_v3') || '[]');
+let filtered = [...records];
+let charts = {};
+
+// ===== CSV =====
+function loadCSV(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => parseCSV(e.target.result);
+  reader.readAsText(file, 'UTF-8');
+}
+function parseCSV(text) {
+  const lines = text.replace(/\r/g,'').split('\n').filter(l=>l.trim());
+  if (lines.length < 2) { showImportMsg('error','データが空です'); return; }
+  const delim = lines[0].includes('\t') ? '\t' : ',';
+  const headers = lines[0].split(delim).map(h=>h.trim());
+  const col = n => headers.findIndex(h=>h===n);
+  const iEvent=col('企画'),iDate=col('日付'),iDow=col('曜日'),iDayCat=col('日カテゴリ');
+  const iArea=col('エリア'),iLoc=col('ロケーション'),iInner=col('内ロケ'),iStaff=col('稼働人数'),iGet=col('獲得数');
+  const missing = ['企画','エリア','ロケーション','稼働人数','獲得数'].filter(n=>col(n)===-1);
+  if (missing.length) { showImportMsg('error',`必須列が見つかりません: ${missing.join(', ')}`); return; }
+  const newRecs=[]; let skipped=0;
+  for (let i=1;i<lines.length;i++) {
+    const c=lines[i].split(delim);
+    const staff=parseFloat(c[iStaff]), get=parseFloat(c[iGet]);
+    if (isNaN(get)){skipped++;continue;}
+    newRecs.push({
+      id:Date.now()+i,
+      event:(c[iEvent]||'').trim(), date:iDate>=0?(c[iDate]||'').trim():'',
+      dow:iDow>=0?(c[iDow]||'').trim():'', daycat:iDayCat>=0?(c[iDayCat]||'').trim():'',
+      area:(c[iArea]||'').trim(), location:(c[iLoc]||'').trim(),
+      inner:iInner>=0?(c[iInner]||'').trim():'',
+      staff:isNaN(staff)?0:staff, get, ave:(!isNaN(staff)&&staff>0)?+(get/staff).toFixed(2):0
+    });
+  }
+  records = newRecs;
+  save(); applyGlobalFilter();
+  showImportMsg('ok',`✅ ${newRecs.length}件インポートしました${skipped?`（${skipped}件スキップ）`:''}`);
+  document.getElementById('import-preview').innerHTML = previewTable(newRecs.slice(0,5));
+}
+function previewTable(rows) {
+  if(!rows.length)return'';
+  return`<p style="font-size:0.8rem;color:#666;margin-bottom:6px">プレビュー（先頭5件）</p>
+  <div class="table-wrap"><table><thead><tr><th>企画</th><th>日付</th><th>曜日</th><th>日カテゴリ</th><th>エリア</th><th>ロケーション</th><th>内ロケ</th><th>稼働人数</th><th>獲得数</th><th>個人Ave</th></tr></thead>
+  <tbody>${rows.map(r=>`<tr><td>${r.event}</td><td>${r.date}</td><td>${r.dow}</td><td>${r.daycat}</td><td>${r.area}</td><td>${r.location}</td><td>${r.inner}</td><td>${r.staff}</td><td>${r.get}</td><td>${r.ave}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function showImportMsg(type,msg){
+  document.getElementById('import-msg').innerHTML=`<p style="padding:10px;border-radius:8px;margin-bottom:12px;background:${type==='ok'?'#e8f5e9':'#ffebee'};color:${type==='ok'?'#2e7d32':'#c62828'};font-size:0.88rem">${msg}</p>`;
+}
+function clearAll(){
+  if(!confirm('全データを削除しますか？'))return;
+  records=[];filtered=[];save();applyGlobalFilter();
+  document.getElementById('data-count').textContent=0;
+  document.getElementById('import-preview').innerHTML='';
+  showImportMsg('ok','🗑 全データを削除しました');
+}
+function downloadSample(){
+  const csv='企画\t日付\t曜日\t日カテゴリ\tエリア\tロケーション\t内ロケ\t稼働人数\t獲得数\t個人Ave\n夏祭り2025\t2025/08/01\t金\t平日\t東エリア\t東会場\tAブース\t5\t20\t4.0\n夏祭り2025\t2025/08/02\t土\t休日\t東エリア\t東会場\tBブース\t4\t16\t4.0\n秋祭り2025\t2025/10/01\t水\t平日\t西エリア\t西会場\tAブース\t6\t30\t5.0\n';
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/tab-separated-values;charset=utf-8'}));
+  a.download='sample_saiji.tsv';a.click();
+}
+function save(){localStorage.setItem('saiji_v3',JSON.stringify(records));}
+
+// ===== ユーティリティ =====
+function unique(arr){return[...new Set(arr.filter(Boolean))].sort();}
+function groupBy(arr,key){
+  const m={};
+  arr.forEach(r=>{const k=r[key]||'(未設定)';if(!m[k])m[k]=[];m[k].push(r);});
+  return m;
+}
+function aggStats(rows){
+  if(!rows.length)return{total:0,staff:0,ave:0,count:0,maxGet:0,minGet:0,days:0};
+  const total=rows.reduce((s,r)=>s+r.get,0);
+  const staff=rows.reduce((s,r)=>s+r.staff,0);
+  const ave=staff>0?total/staff:0;
+  const days=unique(rows.map(r=>r.date)).length;
+  return{total,staff,ave,count:rows.length,maxGet:Math.max(...rows.map(r=>r.get)),minGet:Math.min(...rows.map(r=>r.get)),days};
+}
+function hsl(i,n){return`hsl(${210+i*(150/Math.max(n,1))},65%,55%)`;}
+function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+function makeBarChart(id,labels,datasets,yLabel='',refLine=null){
+  destroyChart(id);
+  const ctx=document.getElementById(id);if(!ctx)return;
+  const plugins={legend:{display:datasets.length>1}};
+  const annotations={};
+  if(refLine!==null){
+    annotations.refLine={type:'line',yMin:refLine,yMax:refLine,borderColor:'rgba(229,57,53,0.8)',borderWidth:2,borderDash:[6,4],
+      label:{content:`施設全体Ave: ${refLine}`,display:true,position:'end',backgroundColor:'rgba(229,57,53,0.15)',color:'#e53935',font:{size:11}}};
+  }
+  charts[id]=new Chart(ctx,{
+    type:'bar',data:{labels,datasets},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{...plugins,annotation:Object.keys(annotations).length?{annotations}:undefined},
+      scales:{y:{beginAtZero:true,title:{display:!!yLabel,text:yLabel}}}
+    }
+  });
+}
+
+// ===== 共通フィルター =====
+function buildGlobalFilterOptions(){
+  const events=unique(records.map(r=>r.event));
+  const areas=unique(records.map(r=>r.area));
+  const locs=unique(records.map(r=>r.location));
+  const daycats=unique(records.map(r=>r.daycat));
+  const dows=unique(records.map(r=>r.dow));
+  function setOpts(id,arr){
+    const el=document.getElementById(id);if(!el)return;
+    const cur=el.value;
+    el.innerHTML='<option value="">すべて</option>'+arr.map(v=>`<option value="${v}"${v===cur?' selected':''}>${v}</option>`).join('');
+  }
+  function setOptsNoAll(id,arr){
+    const el=document.getElementById(id);if(!el)return;
+    el.innerHTML='<option value="">選択</option>'+arr.map(v=>`<option value="${v}">${v}</option>`).join('');
+  }
+  setOpts('gf-event',events); setOpts('gf-area',areas); setOpts('gf-loc',locs);
+  setOpts('gf-daycat',daycats); setOpts('gf-dow',dows);
+  setOptsNoAll('c-e1',events); setOptsNoAll('c-e2',events);
+  setOptsNoAll('c-l1',locs); setOptsNoAll('c-l2',locs); setOptsNoAll('c-loc-event',locs);
+  document.getElementById('data-count').textContent=records.length;
+}
+
+function applyGlobalFilter(){
+  const search=document.getElementById('gf-search').value.toLowerCase();
+  const ev=document.getElementById('gf-event').value;
+  const area=document.getElementById('gf-area').value;
+  const loc=document.getElementById('gf-loc').value;
+  const daycat=document.getElementById('gf-daycat').value;
+  const dow=document.getElementById('gf-dow').value;
+  filtered=records.filter(r=>{
+    if(ev&&r.event!==ev)return false;
+    if(area&&r.area!==area)return false;
+    if(loc&&r.location!==loc)return false;
+    if(daycat&&r.daycat!==daycat)return false;
+    if(dow&&r.dow!==dow)return false;
+    if(search){
+      const hay=[r.event,r.area,r.location,r.inner,r.daycat,r.dow,r.date].join(' ').toLowerCase();
+      if(!hay.includes(search))return false;
+    }
+    return true;
+  });
+  document.getElementById('gf-count').textContent=`${filtered.length} / ${records.length} 件`;
+  buildGlobalFilterOptions();
+  const active=document.querySelector('.tab.active');
+  if(active){
+    const idx=[...document.querySelectorAll('.tab')].indexOf(active);
+    const names=['upload','list','analytics'];
+    const name=names[idx];
+    if(name==='list')renderList();
+    if(name==='analytics')renderAnalytics();
+  }
+}
+
+function resetGlobalFilter(){
+  document.getElementById('gf-search').value='';
+  ['gf-event','gf-area','gf-loc','gf-daycat','gf-dow'].forEach(id=>document.getElementById(id).value='');
+  applyGlobalFilter();
+}
+
+// ===== タブ切替 =====
+function switchTab(name){
+  ['upload','list','analytics'].forEach((t,i)=>{
+    document.querySelectorAll('.tab')[i].classList.toggle('active',t===name);
+    document.getElementById('tab-'+t).classList.toggle('active',t===name);
+  });
+  if(name==='list')renderList();
+  if(name==='analytics')renderAnalytics();
+  if(name==='compare')renderRankings();
+}
+
+// ===== 一覧 =====
+function renderList(){
+  const el=document.getElementById('list-body');
+  if(!filtered.length){el.innerHTML='<div class="empty">データがありません</div>';return;}
+  el.innerHTML=`<p style="font-size:0.8rem;color:#999;margin-bottom:8px">${filtered.length}件表示</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>企画</th><th>日付</th><th>曜日</th><th>日カテゴリ</th><th>エリア</th><th>ロケーション</th><th>内ロケ</th><th>稼働人数</th><th>獲得数</th><th>個人Ave</th></tr></thead>
+    <tbody>${filtered.map(r=>`<tr>
+      <td><span class="badge">${r.event}</span></td><td>${r.date}</td><td>${r.dow}</td>
+      <td><span class="badge badge-orange">${r.daycat}</span></td>
+      <td>${r.area}</td><td>${r.location}</td><td>${r.inner}</td>
+      <td>${r.staff}</td><td><strong>${r.get}</strong></td>
+      <td class="highlight">${r.ave}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+// ===== 集計 =====
+function renderAnalytics(){
+  const axisKey='location';
+  // エリアフィルター選択肢を更新
+  const areaFilterEl=document.getElementById('a-area-filter');
+  const curArea=areaFilterEl.value;
+  const allAreas=unique(filtered.map(r=>r.area));
+  areaFilterEl.innerHTML='<option value="">すべて</option>'+allAreas.map(a=>`<option value="${a}"${a===curArea?' selected':''}>${a}</option>`).join('');
+  // エリアで絞り込み
+  const areaFiltered=curArea?filtered.filter(r=>r.area===curArea):filtered;
+  if(!areaFiltered.length){document.getElementById('a-stats').innerHTML='<div class="empty">データがありません</div>';return;}
+  const s=aggStats(areaFiltered);
+  document.getElementById('a-stats').innerHTML=`
+    <div class="stat-card"><div class="slabel">総獲得数</div><div class="svalue">${s.total}</div><div class="ssub">件</div></div>
+    <div class="stat-card"><div class="slabel">データ数</div><div class="svalue">${s.count}</div><div class="ssub">行</div></div>
+    <div class="stat-card"><div class="slabel">全体 個人Ave</div><div class="svalue">${s.ave.toFixed(2)}</div><div class="ssub">件/人</div></div>
+    <div class="stat-card"><div class="slabel">総稼働人数</div><div class="svalue">${s.staff}</div><div class="ssub">人</div></div>
+    <div class="stat-card"><div class="slabel">最大獲得</div><div class="svalue">${s.maxGet}</div><div class="ssub">件</div></div>
+    <div class="stat-card"><div class="slabel">最小獲得</div><div class="svalue">${s.minGet}</div><div class="ssub">件</div></div>`;
+  const grouped=groupBy(areaFiltered,axisKey);
+  const keys=Object.keys(grouped);
+  const avgs=keys.map(k=>+aggStats(grouped[k]).ave.toFixed(2));
+  const totals=keys.map(k=>aggStats(grouped[k]).total);
+  const staffs=keys.map(k=>aggStats(grouped[k]).staff);
+  const colors=keys.map((_,i)=>hsl(i,keys.length));
+  makeBarChart('chart-avg',keys,[{label:'個人Ave',data:avgs,backgroundColor:colors,borderRadius:5}],'個人Ave（件/人）');
+  makeBarChart('chart-total',keys,[{label:'合計獲得数',data:totals,backgroundColor:colors,borderRadius:5}],'獲得数（件）');
+  makeBarChart('chart-staff',keys,[{label:'稼働人数',data:staffs,backgroundColor:'#90caf9',borderRadius:5},{label:'獲得数',data:totals,backgroundColor:'#ef9a9a',borderRadius:5}]);
+
+  // 詳細テーブル
+  const axisLabel={event:'企画',area:'エリア',location:'ロケーション',inner:'内ロケ',dow:'曜日',daycat:'日カテゴリ'};
+  const allEvents=unique(areaFiltered.map(r=>r.event));
+
+  document.getElementById('a-table').innerHTML=`<table>
+    <thead><tr>
+      <th>ロケーション</th>
+      <th>エリア</th>
+      <th>企画</th>
+      <th>日カテゴリ</th>
+      <th>開催数</th><th>総稼働数</th><th>合計獲得数</th>
+      <th>施設Ave<br><span style="font-weight:400;font-size:0.75rem">獲得÷開催</span></th>
+      <th>個人Ave<br><span style="font-weight:400;font-size:0.75rem">獲得÷稼働</span></th>
+      <th>詳細</th>
+    </tr></thead>
+    <tbody id="a-table-body"></tbody>
+  </table>`;
+  renderAnalyticsTableBody(axisKey, grouped, keys, allEvents);
+}
+
+function renderAnalyticsTableBody(axisKey, grouped, keys, allEvents){
+  const body=document.getElementById('a-table-body');
+  if(!body)return;
+  const rows_html=keys.map((k,idx)=>{
+    const rows=grouped[k];
+    const st=aggStats(rows);
+    const facilityAve=st.count>0?(st.total/st.count).toFixed(2):'-';
+    const personalAve=st.staff>0?(st.total/st.staff).toFixed(2):'-';
+    const areaVal=rows.length?rows[0].area:'';
+    const safeKey='loc'+idx;
+
+    // 第1段階：企画別合計行 ＋ 第2段階：日カテゴリ別行
+    const byEvent=groupBy(rows,'event');
+    const eventRows=Object.keys(byEvent).map((e,eidx)=>{
+      const es=aggStats(byEvent[e]);
+      const eFacAve=es.count>0?(es.total/es.count).toFixed(2):'-';
+      const ePerAve=es.staff>0?(es.total/es.staff).toFixed(2):'-';
+      const safeEvent=safeKey+'e'+eidx;
+
+      // 第2段階：日カテゴリ別
+      const byDaycat=groupBy(byEvent[e],'daycat');
+      const daycatRows=Object.keys(byDaycat).map(dc=>{
+        const ds=aggStats(byDaycat[dc]);
+        const dFacAve=ds.count>0?(ds.total/ds.count).toFixed(2):'-';
+        const dPerAve=ds.staff>0?(ds.total/ds.staff).toFixed(2):'-';
+        return`<tr class="detail-row-${safeEvent}" style="display:none;background:#eef0ff;">
+          <td style="padding-left:44px;color:#777">└ ${k}</td>
+          <td style="color:#999;font-size:0.78rem">${areaVal}</td>
+          <td style="color:#555">${e}</td>
+          <td><span class="badge ${dc==='休日'?'badge-orange':''}">${dc}</span></td>
+          <td>${ds.count}</td><td>${ds.staff}</td><td>${ds.total}</td>
+          <td class="highlight">${dFacAve}</td>
+          <td class="highlight">${dPerAve}</td>
+          <td></td>
+        </tr>`;
+      }).join('');
+
+      return`<tr class="detail-row-${safeKey}" style="display:none;background:#f4f6ff;">
+        <td style="padding-left:22px;color:#555">└ ${k}</td>
+        <td style="color:#999;font-size:0.78rem">${areaVal}</td>
+        <td><strong>${e}</strong></td>
+        <td>－</td>
+        <td>${es.count}</td><td>${es.staff}</td><td>${es.total}</td>
+        <td class="highlight">${eFacAve}</td>
+        <td class="highlight">${ePerAve}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="toggleDetail('${safeEvent}',this)">▶</button></td>
+      </tr>${daycatRows}`;
+    }).join('');
+
+    return`<tr data-key="${k}">
+      <td><strong>${k}</strong></td>
+      <td>${areaVal}</td>
+      <td>－</td><td>－</td>
+      <td>${st.count}</td>
+      <td>${st.staff}</td>
+      <td>${st.total}</td>
+      <td class="highlight">${facilityAve}</td>
+      <td class="highlight">${personalAve}</td>
+      <td><button class="btn btn-secondary btn-sm" onclick="toggleDetail('${safeKey}',this)">▶ 詳細</button></td>
+    </tr>${eventRows}`;
+  }).join('');
+  body.innerHTML=rows_html;
+}
+
+function toggleDetail(safeKey, btn){
+  const rows=document.querySelectorAll('.detail-row-'+safeKey);
+  const isOpen=btn.textContent.indexOf('▼')>=0;
+  rows.forEach(r=>r.style.display=isOpen?'none':'table-row');
+  btn.textContent=isOpen?'▶ 詳細':'▼ 詳細';
+  if(btn.textContent==='▶ 詳細'){
+    // 企画詳細を閉じたら日カテゴリ詳細も閉じる
+    rows.forEach(r=>{
+      const innerBtn=r.querySelector('button');
+      if(innerBtn&&innerBtn.textContent.indexOf('▼')>=0){
+        const innerKey=innerBtn.getAttribute('onclick').match(/toggleDetail\('([^']+)'/)[1];
+        document.querySelectorAll('.detail-row-'+innerKey).forEach(ir=>ir.style.display='none');
+        innerBtn.textContent='▶';
+      }
+    });
+  }
+}
+
+// Drag & Drop
+const dz=document.getElementById('drop-zone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('dragover');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('dragover'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('dragover');loadCSV(e.dataTransfer.files[0]);});
+
+// 初期化
+applyGlobalFilter();
+</script>
+</body>
+</html>
