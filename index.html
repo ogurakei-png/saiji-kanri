@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>祭事 獲得数管理</title>
+<title>施設別獲得数管理</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -54,15 +54,6 @@ header h1 { font-size: 1.15rem; font-weight: 700; }
 h2 { font-size: 1rem; color: #1a237e; margin-bottom: 14px; font-weight: 700; border-left: 4px solid #3949ab; padding-left: 10px; }
 h3 { font-size: 0.9rem; color: #3949ab; margin: 18px 0 10px; font-weight: 700; }
 
-.upload-area {
-  border: 2px dashed #9fa8da; border-radius: 12px;
-  padding: 36px; text-align: center; cursor: pointer;
-  transition: all 0.2s; background: #f8f9ff; margin-bottom: 16px;
-}
-.upload-area:hover, .upload-area.dragover { border-color: #3949ab; background: #e8eaf6; }
-.upload-area .icon { font-size: 2.4rem; margin-bottom: 8px; }
-.upload-area p { color: #666; font-size: 0.9rem; }
-.upload-area input[type=file] { display: none; }
 
 .format-hint {
   background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 8px;
@@ -134,7 +125,7 @@ tr:hover td { background: #fafbff; }
 
 <header>
   <span style="font-size:1.5rem">🏮</span>
-  <h1>祭事 獲得数管理システム</h1>
+  <h1>施設別獲得数管理</h1>
 </header>
 
 <!-- 共通フィルターバー -->
@@ -151,30 +142,26 @@ tr:hover td { background: #fafbff; }
 
 <div class="container">
   <div class="tabs">
-    <button class="tab active" onclick="switchTab('upload')">📂 CSVインポート</button>
+    <button class="tab active" onclick="switchTab('upload')">📊 SSデータ読み込み</button>
     <button class="tab" onclick="switchTab('list')">📋 一覧</button>
     <button class="tab" onclick="switchTab('analytics')">📊 集計・グラフ</button>
   </div>
 
-  <!-- CSVインポート -->
+  <!-- SSデータ読み込み -->
   <div class="panel active" id="tab-upload">
-    <h2>CSVファイルをインポート</h2>
-    <div class="format-hint">
-      📋 対応フォーマット（1行目はヘッダー）：<br>
-      <code>企画</code>　<code>日付</code>　<code>曜日</code>　<code>日カテゴリ</code>　<code>エリア</code>　<code>ロケーション</code>　<code>内ロケ</code>　<code>稼働人数</code>　<code>獲得数</code>　<code>個人Ave</code><br>
-      ※ タブ区切り・カンマ区切りどちらも対応。個人Aveはアプリ側で再計算します。
+    <h2>SSデータ読み込み</h2>
+    <div class="format-hint" style="margin-bottom:18px">
+      📊 Googleスプレッドシートからデータを読み込みます。スプレッドシートは<strong>「リンクを知っている全員が閲覧可能」</strong>に設定してください。
     </div>
-    <div class="upload-area" id="drop-zone" onclick="document.getElementById('csv-file').click()">
-      <div class="icon">📁</div>
-      <p>クリックまたはドラッグ＆ドロップでCSVを選択</p>
-      <p style="font-size:0.78rem;color:#aaa;margin-top:6px">.csv / .tsv / .txt 対応</p>
-      <input type="file" id="csv-file" accept=".csv,.tsv,.txt" onchange="loadCSV(this.files[0])">
+    <div style="background:#f8f9ff;border:1.5px solid #c5cae9;border-radius:10px;padding:18px;margin-bottom:16px">
+      <h3 style="margin-top:0;margin-bottom:12px">Googleスプレッドシートから読み込み</h3>
+      <button class="btn btn-primary" onclick="loadFromSheet()">📥 最新データを読み込む</button>
+      <p style="font-size:0.78rem;color:#999;margin-top:10px">スプレッドシートのデータを更新したら、このボタンで再読み込みしてください。</p>
     </div>
     <div id="import-msg"></div>
     <div id="import-preview"></div>
-    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn btn-secondary" onclick="downloadSample()">📥 サンプルCSVをダウンロード</button>
-      <button class="btn btn-danger btn-sm" onclick="clearAll()">🗑 全データ削除</button>
+    <div style="margin-top:16px">
+      <button class="btn btn-danger btn-sm" onclick="clearAll()">全データ削除</button>
     </div>
     <p style="font-size:0.78rem;color:#aaa;margin-top:8px">現在のデータ数: <strong id="data-count">0</strong> 件</p>
   </div>
@@ -220,41 +207,6 @@ let filtered = [...records];
 let charts = {};
 
 // ===== CSV =====
-function loadCSV(file) {
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => parseCSV(e.target.result);
-  reader.readAsText(file, 'UTF-8');
-}
-function parseCSV(text) {
-  const lines = text.replace(/\r/g,'').split('\n').filter(l=>l.trim());
-  if (lines.length < 2) { showImportMsg('error','データが空です'); return; }
-  const delim = lines[0].includes('\t') ? '\t' : ',';
-  const headers = lines[0].split(delim).map(h=>h.trim());
-  const col = n => headers.findIndex(h=>h===n);
-  const iEvent=col('企画'),iDate=col('日付'),iDow=col('曜日'),iDayCat=col('日カテゴリ');
-  const iArea=col('エリア'),iLoc=col('ロケーション'),iInner=col('内ロケ'),iStaff=col('稼働人数'),iGet=col('獲得数');
-  const missing = ['企画','エリア','ロケーション','稼働人数','獲得数'].filter(n=>col(n)===-1);
-  if (missing.length) { showImportMsg('error',`必須列が見つかりません: ${missing.join(', ')}`); return; }
-  const newRecs=[]; let skipped=0;
-  for (let i=1;i<lines.length;i++) {
-    const c=lines[i].split(delim);
-    const staff=parseFloat(c[iStaff]), get=parseFloat(c[iGet]);
-    if (isNaN(get)){skipped++;continue;}
-    newRecs.push({
-      id:Date.now()+i,
-      event:(c[iEvent]||'').trim(), date:iDate>=0?(c[iDate]||'').trim():'',
-      dow:iDow>=0?(c[iDow]||'').trim():'', daycat:iDayCat>=0?(c[iDayCat]||'').trim():'',
-      area:(c[iArea]||'').trim(), location:(c[iLoc]||'').trim(),
-      inner:iInner>=0?(c[iInner]||'').trim():'',
-      staff:isNaN(staff)?0:staff, get, ave:(!isNaN(staff)&&staff>0)?+(get/staff).toFixed(2):0
-    });
-  }
-  records = newRecs;
-  save(); applyGlobalFilter();
-  showImportMsg('ok',`✅ ${newRecs.length}件インポートしました${skipped?`（${skipped}件スキップ）`:''}`);
-  document.getElementById('import-preview').innerHTML = previewTable(newRecs.slice(0,5));
-}
 function previewTable(rows) {
   if(!rows.length)return'';
   return`<p style="font-size:0.8rem;color:#666;margin-bottom:6px">プレビュー（先頭5件）</p>
@@ -271,12 +223,46 @@ function clearAll(){
   document.getElementById('import-preview').innerHTML='';
   showImportMsg('ok','🗑 全データを削除しました');
 }
-function downloadSample(){
-  const csv='企画\t日付\t曜日\t日カテゴリ\tエリア\tロケーション\t内ロケ\t稼働人数\t獲得数\t個人Ave\n夏祭り2025\t2025/08/01\t金\t平日\t東エリア\t東会場\tAブース\t5\t20\t4.0\n夏祭り2025\t2025/08/02\t土\t休日\t東エリア\t東会場\tBブース\t4\t16\t4.0\n秋祭り2025\t2025/10/01\t水\t平日\t西エリア\t西会場\tAブース\t6\t30\t5.0\n';
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/tab-separated-values;charset=utf-8'}));
-  a.download='sample_saiji.tsv';a.click();
+
+// ===== Googleスプレッドシート読み込み =====
+const GAS_URL = 'https://script.google.com/a/macros/nissen-linx.co.jp/s/AKfycbzmky0KXOf8pfDGUyoE6rPlBLt6EmgBJdH2wt7Imwl59polMkiPVe4tI6KJxwgeCykv3w/exec';
+
+async function loadFromSheet(){
+  showImportMsg('ok','⏳ 読み込み中...');
+  try {
+    const res = await fetch(GAS_URL);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const json = await res.json();
+    if(!json.length){ showImportMsg('error','データが空です'); return; }
+    const newRecs = [];
+    let skipped = 0;
+    json.forEach((row, i) => {
+      const get = parseFloat(row['獲得数']);
+      const staff = parseFloat(row['稼働人数']);
+      if(isNaN(get)){ skipped++; return; }
+      newRecs.push({
+        id: Date.now()+i,
+        event: (row['企画']||'').toString().trim(),
+        date:  (row['日付']||'').toString().trim(),
+        dow:   (row['曜日']||'').toString().trim(),
+        daycat:(row['日カテゴリ']||'').toString().trim(),
+        area:  (row['エリア']||'').toString().trim(),
+        location:(row['ロケーション']||'').toString().trim(),
+        inner: (row['内ロケ']||'').toString().trim(),
+        staff: isNaN(staff)?0:staff,
+        get,
+        ave: (!isNaN(staff)&&staff>0)?+(get/staff).toFixed(2):0
+      });
+    });
+    records = newRecs;
+    save(); applyGlobalFilter();
+    showImportMsg('ok', `✅ ${newRecs.length}件読み込みました${skipped?`（${skipped}件スキップ）`:''}`);
+    document.getElementById('import-preview').innerHTML = previewTable(newRecs.slice(0,5));
+  } catch(e) {
+    showImportMsg('error', '❌ 読み込みに失敗しました。<br>エラー: '+e.message);
+  }
 }
+
 function save(){localStorage.setItem('saiji_v3',JSON.stringify(records));}
 
 // ===== ユーティリティ =====
@@ -534,11 +520,7 @@ function toggleDetail(safeKey, btn){
   }
 }
 
-// Drag & Drop
-const dz=document.getElementById('drop-zone');
-dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('dragover');});
-dz.addEventListener('dragleave',()=>dz.classList.remove('dragover'));
-dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('dragover');loadCSV(e.dataTransfer.files[0]);});
+
 
 // 初期化
 applyGlobalFilter();
