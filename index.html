@@ -687,8 +687,10 @@ function renderSelectedTab(){
     eventsInSelection.map(e=>`<option value="${e}"${e===curEvent?' selected':''}>${e}</option>`).join('');
 }
 
-// ===== 分析実行（AI接続は今後対応） =====
-function runAnalysis(){
+// ===== 分析実行（AI考察付き） =====
+const ANTHROPIC_API_KEY = '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';
+
+async function runAnalysis(){
   const event = document.getElementById('analysis-event').value;
   const resultEl = document.getElementById('analysis-result');
   if(!selectedLocations.length){
@@ -700,23 +702,32 @@ function runAnalysis(){
     return;
   }
 
+  // 選択施設×企画の実績データ
   const targetRows = records.filter(r => selectedLocations.includes(r.location) && r.event === event);
-  if(!targetRows.length){
-    resultEl.innerHTML = '<div class="empty">該当するデータがありません</div>';
-    return;
-  }
-
   const st = aggStats(targetRows);
   const facAve = st.count>0?(st.total/st.count).toFixed(2):'-';
   const perAve = st.staff>0?(st.total/st.staff).toFixed(2):'-';
 
   // 施設別の内訳
-  const byLoc = groupBy(targetRows,'location');
-  const locDetail = Object.keys(byLoc).map(loc=>{
-    const ls = aggStats(byLoc[loc]);
-    return {loc, ave:ls.staff>0?(ls.total/ls.staff):0, total:ls.total, count:ls.count};
+  const byLoc = groupBy(records.filter(r=>selectedLocations.includes(r.location)), 'location');
+  const locDetail = selectedLocations.map(loc=>{
+    const locRows = records.filter(r=>r.location===loc && r.event===event);
+    const ls = aggStats(locRows);
+    const allLocRows = records.filter(r=>r.location===loc);
+    const area = allLocRows.length?allLocRows[0].area:'';
+    const hasData = locRows.length > 0;
+    return {loc, area, hasData, ave:ls.staff>0?(ls.total/ls.staff):0, total:ls.total, count:ls.count, staff:ls.staff};
   }).sort((a,b)=>b.ave-a.ave);
 
+  // 未実施施設の同エリア内他施設データを収集
+  const unimplementedLocs = locDetail.filter(d=>!d.hasData);
+  const refDataByLoc = {};
+  unimplementedLocs.forEach(d=>{
+    const sameAreaRows = records.filter(r=>r.area===d.area && r.event===event && !selectedLocations.includes(r.location));
+    if(sameAreaRows.length) refDataByLoc[d.loc] = sameAreaRows;
+  });
+
+  // サマリー表示
   resultEl.innerHTML = `
     <div class="stats-grid">
       <div class="stat-card"><div class="slabel">対象企画</div><div class="svalue" style="font-size:1rem">${event}</div></div>
@@ -727,15 +738,104 @@ function runAnalysis(){
       <div class="stat-card"><div class="slabel">個人Ave</div><div class="svalue">${perAve}</div></div>
     </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>順位</th><th>施設</th><th>開催数</th><th>合計獲得数</th><th>個人Ave</th></tr></thead>
-      <tbody>${locDetail.map((d,i)=>`<tr>
-        <td>${i+1}位</td><td><strong>${d.loc}</strong></td><td>${d.count}</td><td>${d.total}</td>
-        <td class="${i===0?'highlight':''}">${d.ave.toFixed(2)}</td>
+      <thead><tr><th>施設</th><th>エリア</th><th>状況</th><th>開催数</th><th>合計獲得数</th><th>個人Ave</th></tr></thead>
+      <tbody>${locDetail.map(d=>`<tr>
+        <td><strong>${d.loc}</strong></td>
+        <td>${d.area}</td>
+        <td>${d.hasData?'<span class="badge badge-green">実施済</span>':'<span class="badge badge-orange">未実施</span>'}</td>
+        <td>${d.hasData?d.count:'-'}</td>
+        <td>${d.hasData?d.total:'-'}</td>
+        <td class="${d.hasData&&d.ave>0?'highlight':''}">${d.hasData?d.ave.toFixed(2):'-'}</td>
       </tr>`).join('')}</tbody>
     </table></div>
-    <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:14px;margin-top:14px;font-size:0.85rem;color:#795548">
-      🤖 AIによる考察コメント機能は準備中です。APIキー設定後にこちらに自動分析コメントが表示されます。
+    <hr class="sep">
+    <div id="ai-comment-area">
+      <div style="text-align:center;padding:24px;color:#999">
+        <span style="font-size:1.4rem">🤖</span><br>
+        <span style="font-size:0.9rem">AI考察を生成中...</span>
+      </div>
     </div>`;
+
+  // AI考察プロンプト構築
+  const implRows = locDetail.filter(d=>d.hasData);
+  const unimplRows = locDetail.filter(d=>!d.hasData);
+
+  // 施設全体のデータサマリー
+  const locSummaries = selectedLocations.map(loc=>{
+    const allLocRows = records.filter(r=>r.location===loc);
+    const s = aggStats(allLocRows);
+    const byEvent = groupBy(allLocRows,'event');
+    const eventList = Object.keys(byEvent).map(e=>{
+      const es = aggStats(byEvent[e]);
+      const dc = groupBy(byEvent[e],'daycat');
+      const dcStr = Object.keys(dc).map(d=>{const ds=aggStats(dc[d]);return`${d}:個人Ave${ds.ave.toFixed(2)}`}).join('、');
+      return `  ・${e}：開催${es.count}回、合計獲得${es.total}件、個人Ave${es.ave.toFixed(2)}（${dcStr}）`;
+    }).join('\n');
+    const area = allLocRows.length?allLocRows[0].area:'';
+    return `【${loc}（${area}）】\n${eventList||'  データなし'}`;
+  }).join('\n\n');
+
+  // 未実施施設の参考データ
+  const refSummary = unimplRows.map(d=>{
+    const ref = refDataByLoc[d.loc];
+    if(!ref) return `【${d.loc}】同エリア内に参考データなし`;
+    const rs = aggStats(ref);
+    const refLocs = unique(ref.map(r=>r.location));
+    return `【${d.loc}（未実施）の参考：同エリア「${d.area}」内の他施設での${event}実績】\n  対象施設：${refLocs.join('、')}\n  開催${rs.count}回、合計獲得${rs.total}件、個人Ave${rs.ave.toFixed(2)}`;
+  }).join('\n\n');
+
+  const prompt = `あなたは祭事・イベント営業の分析アドバイザーです。以下のデータを分析し、日本語で考察コメントを提供してください。
+
+【分析対象企画】${event}
+【選択施設数】${selectedLocations.length}施設
+
+■ 各施設の全企画実績データ
+${locSummaries}
+
+${unimplRows.length>0?`■ 未実施施設への推奨（同エリア参考データ）\n${refSummary}`:''}
+
+以下の3点について具体的に分析してください：
+1. **施設の強み・弱み分析**：「${event}」における各施設のパフォーマンスを比較し、強みと改善点を指摘してください
+2. **企画別パフォーマンス評価**：各施設での企画実績から見えるパターンや特徴を分析してください
+3. **平日・休日の傾向分析**：平日と休日の個人Aveの差から示唆されることを分析してください
+${unimplRows.length>0?`4. **未実施施設への推奨**：${unimplRows.map(d=>d.loc).join('、')}での「${event}」実施可能性を同エリアの実績データから予測・推奨してください`:''}
+
+数値を引用しながら、実践的なアドバイスを簡潔にまとめてください。`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'interleaved-thinking-2025-05-14'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1500,
+        messages: [{role:'user', content: prompt}]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.filter(c=>c.type==='text').map(c=>c.text).join('') || 'コメントを取得できませんでした';
+    // マークダウン簡易変換
+    const html = text
+      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+      .replace(/\n\n/g,'</p><p>')
+      .replace(/\n/g,'<br>')
+      .replace(/^/,'<p>').replace(/$/,'</p>');
+    document.getElementById('ai-comment-area').innerHTML = `
+      <div style="background:#f0f4ff;border:1.5px solid #c5cae9;border-radius:10px;padding:18px">
+        <h3 style="margin-top:0;margin-bottom:12px">🤖 AI考察コメント</h3>
+        <div style="font-size:0.88rem;line-height:1.8;color:#333">${html}</div>
+      </div>`;
+  } catch(e) {
+    document.getElementById('ai-comment-area').innerHTML = `
+      <div style="background:#ffebee;border:1px solid #ef9a9a;border-radius:8px;padding:14px;font-size:0.85rem;color:#c62828">
+        ❌ AI考察の取得に失敗しました：${e.message}
+      </div>`;
+  }
 }
 
 
