@@ -127,6 +127,15 @@ table { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 50
 th { background: var(--paper); color: var(--ink-faint); padding: 10px 10px; text-align: left; font-weight: 500; white-space: nowrap; border-bottom: 2px solid var(--accent); font-size: 0.7rem; letter-spacing: 0.03em; text-transform: uppercase; }
 td { padding: 9px 10px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; color: var(--ink); }
 tr:hover td { background: var(--canvas); }
+
+/* 詳細テーブル：選択・詳細列を左固定 */
+#a-table th:nth-child(1), #a-table td:nth-child(1),
+#a-table th:nth-child(2), #a-table td:nth-child(2) {
+  position: sticky; background: var(--paper); z-index: 2;
+}
+#a-table th:nth-child(1), #a-table td:nth-child(1) { left: 0; min-width: 44px; }
+#a-table th:nth-child(2), #a-table td:nth-child(2) { left: 44px; min-width: 76px; box-shadow: 2px 0 4px -2px rgba(0,0,0,0.08); }
+#a-table tr:hover td:nth-child(1), #a-table tr:hover td:nth-child(2) { background: var(--canvas); }
 .badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 0.72rem; font-weight: 500; background: var(--accent-soft); color: var(--ink-soft); }
 .badge-green { background: var(--accent-soft); color: var(--accent-dark); }
 .badge-orange { background: #faeee9; color: var(--warn); }
@@ -535,6 +544,7 @@ function renderAnalytics(){
   document.getElementById('a-table').innerHTML=`<table>
     <thead><tr>
       <th>選択</th>
+      <th>詳細</th>
       <th>ロケーション</th>
       <th>エリア</th>
       <th>企画</th>
@@ -542,7 +552,6 @@ function renderAnalytics(){
       <th>開催数</th><th>総稼働数</th><th>合計獲得数</th>
       <th>施設Ave<br><span style="font-weight:400;font-size:0.75rem">獲得÷開催</span></th>
       <th>個人Ave<br><span style="font-weight:400;font-size:0.75rem">獲得÷稼働</span></th>
-      <th>詳細</th>
     </tr></thead>
     <tbody id="a-table-body"></tbody>
   </table>`;
@@ -576,6 +585,7 @@ function renderAnalyticsTableBody(axisKey, grouped, keys, allEvents){
         const dPerAve=ds.staff>0?(ds.total/ds.staff).toFixed(2):'-';
         return`<tr class="detail-row-${safeEvent}" style="display:none;background:#eef0ff;">
           <td></td>
+          <td></td>
           <td style="padding-left:44px;color:#777">└ ${k}</td>
           <td style="color:#999;font-size:0.78rem">${areaVal}</td>
           <td style="color:#555">${e}</td>
@@ -583,12 +593,12 @@ function renderAnalyticsTableBody(axisKey, grouped, keys, allEvents){
           <td>${ds.count}</td><td>${ds.staff}</td><td>${ds.total}</td>
           <td class="highlight">${dFacAve}</td>
           <td class="highlight">${dPerAve}</td>
-          <td></td>
         </tr>`;
       }).join('');
 
       return`<tr class="detail-row-${safeKey}" style="display:none;background:#f4f6ff;">
         <td></td>
+        <td><button class="btn btn-secondary btn-sm" onclick="toggleDetail('${safeEvent}',this)">▶</button></td>
         <td style="padding-left:22px;color:#555">└ ${k}</td>
         <td style="color:#999;font-size:0.78rem">${areaVal}</td>
         <td><strong>${e}</strong></td>
@@ -596,12 +606,12 @@ function renderAnalyticsTableBody(axisKey, grouped, keys, allEvents){
         <td>${es.count}</td><td>${es.staff}</td><td>${es.total}</td>
         <td class="highlight">${eFacAve}</td>
         <td class="highlight">${ePerAve}</td>
-        <td><button class="btn btn-secondary btn-sm" onclick="toggleDetail('${safeEvent}',this)">▶</button></td>
       </tr>${daycatRows}`;
     }).join('');
 
     return`<tr data-key="${k}">
       <td><input type="checkbox" class="loc-select-cb" data-loc="${encodeURIComponent(k)}" ${selectedLocations.includes(k)?'checked':''} onchange="toggleLocationSelect('${encodeURIComponent(k)}',this.checked)"></td>
+      <td><button class="btn btn-secondary btn-sm" onclick="toggleDetail('${safeKey}',this)">▶ 詳細</button></td>
       <td><strong>${k}</strong></td>
       <td>${areaVal}</td>
       <td>－</td><td>－</td>
@@ -610,7 +620,6 @@ function renderAnalyticsTableBody(axisKey, grouped, keys, allEvents){
       <td>${st.total}</td>
       <td class="highlight">${facilityAve}</td>
       <td class="highlight">${personalAve}</td>
-      <td><button class="btn btn-secondary btn-sm" onclick="toggleDetail('${safeKey}',this)">▶ 詳細</button></td>
     </tr>${eventRows}`;
   }).join('');
   body.innerHTML=rows_html;
