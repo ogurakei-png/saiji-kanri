@@ -155,6 +155,7 @@ tr:hover td { background: #fafbff; }
     <button class="tab active" onclick="switchTab('upload')">📂 データ読み込み</button>
     <button class="tab" onclick="switchTab('list')">📋 一覧</button>
     <button class="tab" onclick="switchTab('analytics')">📊 集計・グラフ</button>
+    <button class="tab" onclick="switchTab('selected')">🎯 選択した施設 <span id="selected-badge" style="display:none;background:#e53935;color:white;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px">0</span></button>
   </div>
 
   <!-- データ読み込み -->
@@ -224,12 +225,32 @@ tr:hover td { background: #fafbff; }
     <div class="table-wrap" id="a-table"></div>
   </div>
 
+  <!-- 選択した施設 -->
+  <div class="panel" id="tab-selected">
+    <h2>🎯 選択した施設</h2>
+    <div id="selected-list-area"></div>
+
+    <hr class="sep">
+    <h3>分析する企画を選択</h3>
+    <div class="row-flex">
+      <div class="form-group" style="min-width:220px">
+        <label>企画</label>
+        <select id="analysis-event"><option value="">企画を選択してください</option></select>
+      </div>
+      <button class="btn btn-primary" onclick="runAnalysis()">🔍 分析</button>
+      <button class="btn btn-secondary btn-sm" onclick="clearSelected()">選択をクリア</button>
+    </div>
+
+    <div id="analysis-result" style="margin-top:18px"></div>
+  </div>
+
 </div>
 
 <script>
 let records = JSON.parse(localStorage.getItem('saiji_v3') || '[]');
 let filtered = [...records];
 let charts = {};
+let selectedLocations = JSON.parse(localStorage.getItem('saiji_selected_locs') || '[]');
 
 // ===== CSV =====
 function loadCSV(file) {
@@ -431,13 +452,13 @@ function resetGlobalFilter(){
 
 // ===== タブ切替 =====
 function switchTab(name){
-  ['upload','list','analytics'].forEach((t,i)=>{
+  ['upload','list','analytics','selected'].forEach((t,i)=>{
     document.querySelectorAll('.tab')[i].classList.toggle('active',t===name);
     document.getElementById('tab-'+t).classList.toggle('active',t===name);
   });
   if(name==='list')renderList();
   if(name==='analytics')renderAnalytics();
-  if(name==='compare')renderRankings();
+  if(name==='selected')renderSelectedTab();
 }
 
 // ===== 一覧 =====
@@ -492,6 +513,7 @@ function renderAnalytics(){
 
   document.getElementById('a-table').innerHTML=`<table>
     <thead><tr>
+      <th>選択</th>
       <th>ロケーション</th>
       <th>エリア</th>
       <th>企画</th>
@@ -532,6 +554,7 @@ function renderAnalyticsTableBody(axisKey, grouped, keys, allEvents){
         const dFacAve=ds.count>0?(ds.total/ds.count).toFixed(2):'-';
         const dPerAve=ds.staff>0?(ds.total/ds.staff).toFixed(2):'-';
         return`<tr class="detail-row-${safeEvent}" style="display:none;background:#eef0ff;">
+          <td></td>
           <td style="padding-left:44px;color:#777">└ ${k}</td>
           <td style="color:#999;font-size:0.78rem">${areaVal}</td>
           <td style="color:#555">${e}</td>
@@ -544,6 +567,7 @@ function renderAnalyticsTableBody(axisKey, grouped, keys, allEvents){
       }).join('');
 
       return`<tr class="detail-row-${safeKey}" style="display:none;background:#f4f6ff;">
+        <td></td>
         <td style="padding-left:22px;color:#555">└ ${k}</td>
         <td style="color:#999;font-size:0.78rem">${areaVal}</td>
         <td><strong>${e}</strong></td>
@@ -556,6 +580,7 @@ function renderAnalyticsTableBody(axisKey, grouped, keys, allEvents){
     }).join('');
 
     return`<tr data-key="${k}">
+      <td><input type="checkbox" class="loc-select-cb" data-loc="${encodeURIComponent(k)}" ${selectedLocations.includes(k)?'checked':''} onchange="toggleLocationSelect('${encodeURIComponent(k)}',this.checked)"></td>
       <td><strong>${k}</strong></td>
       <td>${areaVal}</td>
       <td>－</td><td>－</td>
@@ -588,6 +613,131 @@ function toggleDetail(safeKey, btn){
   }
 }
 
+// ===== 施設選択 =====
+function toggleLocationSelect(encodedLoc, checked){
+  const loc = decodeURIComponent(encodedLoc);
+  if(checked){
+    if(!selectedLocations.includes(loc)) selectedLocations.push(loc);
+  } else {
+    selectedLocations = selectedLocations.filter(l=>l!==loc);
+  }
+  localStorage.setItem('saiji_selected_locs', JSON.stringify(selectedLocations));
+  updateSelectedBadge();
+}
+
+function updateSelectedBadge(){
+  const badge=document.getElementById('selected-badge');
+  if(selectedLocations.length>0){
+    badge.style.display='inline-block';
+    badge.textContent=selectedLocations.length;
+  } else {
+    badge.style.display='none';
+  }
+}
+
+function removeSelectedLocation(loc){
+  selectedLocations = selectedLocations.filter(l=>l!==loc);
+  localStorage.setItem('saiji_selected_locs', JSON.stringify(selectedLocations));
+  updateSelectedBadge();
+  renderSelectedTab();
+}
+
+function clearSelected(){
+  if(!selectedLocations.length) return;
+  if(!confirm('選択した施設をすべてクリアしますか？')) return;
+  selectedLocations = [];
+  localStorage.setItem('saiji_selected_locs', JSON.stringify(selectedLocations));
+  updateSelectedBadge();
+  renderSelectedTab();
+}
+
+function renderSelectedTab(){
+  const area = document.getElementById('selected-list-area');
+  if(!selectedLocations.length){
+    area.innerHTML = '<div class="empty">施設が選択されていません。「集計・グラフ」タブの詳細テーブルでチェックを入れてください。</div>';
+    document.getElementById('analysis-event').innerHTML = '<option value="">企画を選択してください</option>';
+    document.getElementById('analysis-result').innerHTML = '';
+    return;
+  }
+
+  const selRows = records.filter(r => selectedLocations.includes(r.location));
+
+  area.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>ロケーション</th><th>エリア</th><th>開催数</th><th>総稼働数</th><th>合計獲得数</th><th>施設Ave</th><th>個人Ave</th><th></th></tr></thead>
+    <tbody>${selectedLocations.map(loc=>{
+      const rows = records.filter(r=>r.location===loc);
+      const st = aggStats(rows);
+      const facAve = st.count>0?(st.total/st.count).toFixed(2):'-';
+      const perAve = st.staff>0?(st.total/st.staff).toFixed(2):'-';
+      const areaVal = rows.length?rows[0].area:'';
+      return `<tr>
+        <td><strong>${loc}</strong></td><td>${areaVal}</td>
+        <td>${st.count}</td><td>${st.staff}</td><td>${st.total}</td>
+        <td class="highlight">${facAve}</td><td class="highlight">${perAve}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="removeSelectedLocation('${loc.replace(/'/g,"\\'")}')">削除</button></td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+
+  // 企画プルダウンを選択施設内の企画に絞って更新
+  const eventsInSelection = unique(selRows.map(r=>r.event));
+  const curEvent = document.getElementById('analysis-event').value;
+  document.getElementById('analysis-event').innerHTML =
+    '<option value="">企画を選択してください</option>' +
+    eventsInSelection.map(e=>`<option value="${e}"${e===curEvent?' selected':''}>${e}</option>`).join('');
+}
+
+// ===== 分析実行（AI接続は今後対応） =====
+function runAnalysis(){
+  const event = document.getElementById('analysis-event').value;
+  const resultEl = document.getElementById('analysis-result');
+  if(!selectedLocations.length){
+    resultEl.innerHTML = '<div class="empty">施設が選択されていません</div>';
+    return;
+  }
+  if(!event){
+    resultEl.innerHTML = '<p style="color:#e53935;font-size:0.85rem">企画を選択してください</p>';
+    return;
+  }
+
+  const targetRows = records.filter(r => selectedLocations.includes(r.location) && r.event === event);
+  if(!targetRows.length){
+    resultEl.innerHTML = '<div class="empty">該当するデータがありません</div>';
+    return;
+  }
+
+  const st = aggStats(targetRows);
+  const facAve = st.count>0?(st.total/st.count).toFixed(2):'-';
+  const perAve = st.staff>0?(st.total/st.staff).toFixed(2):'-';
+
+  // 施設別の内訳
+  const byLoc = groupBy(targetRows,'location');
+  const locDetail = Object.keys(byLoc).map(loc=>{
+    const ls = aggStats(byLoc[loc]);
+    return {loc, ave:ls.staff>0?(ls.total/ls.staff):0, total:ls.total, count:ls.count};
+  }).sort((a,b)=>b.ave-a.ave);
+
+  resultEl.innerHTML = `
+    <div class="stats-grid">
+      <div class="stat-card"><div class="slabel">対象企画</div><div class="svalue" style="font-size:1rem">${event}</div></div>
+      <div class="stat-card"><div class="slabel">対象施設数</div><div class="svalue">${selectedLocations.length}</div><div class="ssub">施設</div></div>
+      <div class="stat-card"><div class="slabel">合計開催数</div><div class="svalue">${st.count}</div><div class="ssub">回</div></div>
+      <div class="stat-card"><div class="slabel">合計獲得数</div><div class="svalue">${st.total}</div><div class="ssub">件</div></div>
+      <div class="stat-card"><div class="slabel">施設Ave</div><div class="svalue">${facAve}</div></div>
+      <div class="stat-card"><div class="slabel">個人Ave</div><div class="svalue">${perAve}</div></div>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>順位</th><th>施設</th><th>開催数</th><th>合計獲得数</th><th>個人Ave</th></tr></thead>
+      <tbody>${locDetail.map((d,i)=>`<tr>
+        <td>${i+1}位</td><td><strong>${d.loc}</strong></td><td>${d.count}</td><td>${d.total}</td>
+        <td class="${i===0?'highlight':''}">${d.ave.toFixed(2)}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+    <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:14px;margin-top:14px;font-size:0.85rem;color:#795548">
+      🤖 AIによる考察コメント機能は準備中です。APIキー設定後にこちらに自動分析コメントが表示されます。
+    </div>`;
+}
+
 
 
 // Drag & Drop
@@ -598,6 +748,7 @@ dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('dragover'
 
 // 初期化
 applyGlobalFilter();
+updateSelectedBadge();
 </script>
 </body>
 </html>
