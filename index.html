@@ -6,141 +6,162 @@
 <title>施設別獲得数管理</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
+:root {
+  --ink: #1a1a1a;
+  --ink-soft: #6b6b6b;
+  --ink-faint: #a3a3a3;
+  --line: #e4e4e4;
+  --line-soft: #eeeeee;
+  --paper: #ffffff;
+  --canvas: #fafaf8;
+  --accent: #2f4f3a;
+  --accent-soft: #eef3ef;
+  --accent-dark: #1f3a2a;
+  --good: #2f6f4f;
+  --warn: #b5482c;
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Hiragino Sans', 'Meiryo', sans-serif; background: #f0f2f8; color: #333; font-size: 14px; }
+body {
+  font-family: -apple-system, 'Hiragino Sans', 'Yu Gothic', 'Meiryo', sans-serif;
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
 
 header {
-  background: linear-gradient(135deg, #1a237e, #3949ab);
-  color: white; padding: 14px 24px;
-  display: flex; align-items: center; gap: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 22px 32px 18px;
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: baseline; gap: 12px;
 }
-header h1 { font-size: 1.15rem; font-weight: 700; }
+header h1 { font-size: 1.05rem; font-weight: 600; letter-spacing: 0.02em; }
+header .mark { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; }
 
 /* ===== 共通フィルターバー ===== */
 .global-filter {
-  background: white;
-  border-bottom: 1px solid #dde;
-  padding: 10px 24px;
-  display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  padding: 14px 32px;
+  display: flex; gap: 18px; align-items: flex-end; flex-wrap: wrap;
   position: sticky; top: 0; z-index: 100;
 }
-.gf-group { display: flex; flex-direction: column; gap: 3px; }
-.gf-group label { font-size: 0.72rem; color: #888; font-weight: 600; }
+.gf-group { display: flex; flex-direction: column; gap: 5px; }
+.gf-group label { font-size: 0.68rem; color: var(--ink-faint); font-weight: 500; letter-spacing: 0.03em; text-transform: uppercase; }
 .gf-group select, .gf-group input {
-  padding: 6px 10px; border: 1.5px solid #ddd; border-radius: 7px;
-  font-size: 0.82rem; font-family: inherit; outline: none; min-width: 110px;
+  padding: 7px 0; border: none; border-bottom: 1px solid var(--line);
+  font-size: 0.85rem; font-family: inherit; outline: none; min-width: 110px;
+  background: transparent; color: var(--ink); border-radius: 0;
 }
-.gf-group input { min-width: 160px; }
-.gf-group select:focus, .gf-group input:focus { border-color: #3949ab; }
-.btn-reset { padding: 6px 14px; border: none; border-radius: 7px; cursor: pointer; font-size: 0.8rem; font-weight: 700; background: #e8eaf6; color: #3949ab; align-self: flex-end; }
-.btn-reset:hover { background: #c5cae9; }
-.filter-count { font-size: 0.78rem; color: #999; align-self: flex-end; padding-bottom: 2px; }
+.gf-group input { min-width: 170px; }
+.gf-group select:focus, .gf-group input:focus { border-bottom-color: var(--accent); }
+.btn-reset { padding: 7px 0; border: none; background: none; cursor: pointer; font-size: 0.78rem; font-weight: 500; color: var(--ink-faint); align-self: flex-end; text-decoration: underline; text-underline-offset: 3px; }
+.btn-reset:hover { color: var(--ink); }
+.filter-count { font-size: 0.74rem; color: var(--ink-faint); align-self: flex-end; padding-bottom: 8px; letter-spacing: 0.02em; }
 
-.container { max-width: 1200px; margin: 0 auto; padding: 16px 16px; }
+.container { max-width: 1180px; margin: 0 auto; padding: 28px 32px 60px; }
 
-.tabs { display: flex; gap: 6px; margin-bottom: 0; flex-wrap: wrap; }
+.tabs { display: flex; gap: 2px; margin-bottom: 0; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
 .tab {
-  padding: 9px 18px; border: none; border-radius: 8px 8px 0 0;
-  cursor: pointer; font-size: 0.88rem; font-weight: 600;
-  background: #c8cde6; color: #555; transition: all 0.2s;
+  padding: 11px 20px; border: none; background: none;
+  cursor: pointer; font-size: 0.82rem; font-weight: 500;
+  color: var(--ink-faint); transition: color 0.15s;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  letter-spacing: 0.01em;
 }
-.tab.active { background: white; color: #1a237e; }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.tab:hover:not(.active) { color: var(--ink-soft); }
 
-.panel { background: white; border-radius: 0 12px 12px 12px; padding: 22px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); display: none; }
+.panel { background: var(--paper); border: 1px solid var(--line); border-top: 2px solid var(--accent); padding: 32px; display: none; }
 .panel.active { display: block; }
 
-h2 { font-size: 1rem; color: #1a237e; margin-bottom: 14px; font-weight: 700; border-left: 4px solid #3949ab; padding-left: 10px; }
-h3 { font-size: 0.9rem; color: #3949ab; margin: 18px 0 10px; font-weight: 700; }
-
+h2 { font-size: 0.95rem; color: var(--ink); margin-bottom: 20px; font-weight: 600; letter-spacing: 0.01em; }
+h3 { font-size: 0.82rem; color: var(--accent-dark); margin: 26px 0 14px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
 
 .format-hint {
-  background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 8px;
-  padding: 12px 16px; font-size: 0.82rem; color: #2e7d32; margin-bottom: 16px;
+  background: var(--accent-soft); border: 1px solid var(--line-soft); border-left: 2px solid var(--accent);
+  padding: 14px 18px; font-size: 0.8rem; color: var(--ink-soft); margin-bottom: 18px; line-height: 1.7;
 }
-.format-hint code { background: #c8e6c9; padding: 1px 5px; border-radius: 3px; font-size: 0.8rem; }
+.format-hint code { background: var(--accent-soft); padding: 1px 6px; font-size: 0.78rem; color: var(--ink); }
 
 .upload-area {
-  border: 2px dashed #9fa8da; border-radius: 12px;
-  padding: 36px; text-align: center; cursor: pointer;
-  transition: all 0.2s; background: #f8f9ff; margin-bottom: 16px;
+  border: 1px dashed var(--line); border-radius: 2px;
+  padding: 40px; text-align: center; cursor: pointer;
+  transition: all 0.15s; background: var(--canvas); margin-bottom: 16px;
 }
-.upload-area:hover, .upload-area.dragover { border-color: #3949ab; background: #e8eaf6; }
-.upload-area .icon { font-size: 2.4rem; margin-bottom: 8px; }
-.upload-area p { color: #666; font-size: 0.9rem; }
+.upload-area:hover, .upload-area.dragover { border-color: var(--accent); background: var(--accent-soft); }
+.upload-area .icon { font-size: 1.6rem; margin-bottom: 10px; opacity: 0.4; }
+.upload-area p { color: var(--ink-soft); font-size: 0.85rem; }
 .upload-area input[type=file] { display: none; }
 
 select, input {
-  padding: 7px 10px; border: 1.5px solid #ddd; border-radius: 7px;
-  font-size: 0.85rem; font-family: inherit; outline: none; transition: border 0.2s; background: white;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 2px;
+  font-size: 0.84rem; font-family: inherit; outline: none; transition: border 0.15s; background: var(--paper); color: var(--ink);
 }
-select:focus, input:focus { border-color: #3949ab; }
-label { font-size: 0.78rem; color: #666; font-weight: 600; }
-.form-group { display: flex; flex-direction: column; gap: 3px; }
-.row-flex { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
+select:focus, input:focus { border-color: var(--accent); }
+label { font-size: 0.74rem; color: var(--ink-soft); font-weight: 500; letter-spacing: 0.01em; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.row-flex { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
 
-.btn { padding: 8px 18px; border: none; border-radius: 7px; cursor: pointer; font-size: 0.85rem; font-weight: 700; transition: all 0.2s; }
-.btn-primary { background: #3949ab; color: white; }
-.btn-primary:hover { background: #1a237e; }
-.btn-secondary { background: #e8eaf6; color: #3949ab; }
-.btn-secondary:hover { background: #c5cae9; }
-.btn-danger { background: #ef5350; color: white; }
-.btn-danger:hover { background: #c62828; }
-.btn-sm { padding: 5px 12px; font-size: 0.78rem; }
+.btn { padding: 9px 20px; border: 1px solid var(--ink); border-radius: 2px; cursor: pointer; font-size: 0.82rem; font-weight: 500; transition: all 0.15s; letter-spacing: 0.01em; }
+.btn-primary { background: var(--accent); color: var(--paper); border-color: var(--accent); }
+.btn-primary:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
+.btn-secondary { background: var(--paper); color: var(--ink); border-color: var(--line); }
+.btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+.btn-danger { background: var(--paper); color: var(--warn); border-color: var(--warn); }
+.btn-danger:hover { background: var(--warn); color: var(--paper); }
+.btn-sm { padding: 6px 14px; font-size: 0.76rem; }
 
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1px; margin-bottom: 24px; background: var(--line); border: 1px solid var(--line); }
 .stat-card {
-  background: linear-gradient(135deg, #e8eaf6, #fff);
-  border: 1.5px solid #c5cae9; border-radius: 10px; padding: 13px; text-align: center;
+  background: var(--paper);
+  padding: 16px 14px; text-align: left;
 }
-.stat-card .slabel { font-size: 0.72rem; color: #888; margin-bottom: 5px; }
-.stat-card .svalue { font-size: 1.4rem; font-weight: 800; color: #1a237e; }
-.stat-card .ssub { font-size: 0.7rem; color: #aaa; margin-top: 2px; }
+.stat-card .slabel { font-size: 0.68rem; color: var(--ink-faint); margin-bottom: 8px; letter-spacing: 0.02em; text-transform: uppercase; }
+.stat-card .svalue { font-size: 1.5rem; font-weight: 600; color: var(--accent-dark); letter-spacing: -0.01em; }
+.stat-card .ssub { font-size: 0.68rem; color: var(--ink-faint); margin-top: 4px; }
 
 .table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; min-width: 500px; }
-th { background: #e8eaf6; color: #1a237e; padding: 9px 10px; text-align: left; font-weight: 700; white-space: nowrap; }
-td { padding: 7px 10px; border-bottom: 1px solid #f0f0f0; white-space: nowrap; }
-tr:hover td { background: #fafbff; }
-.badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; background: #e8eaf6; color: #3949ab; }
-.badge-green { background: #e8f5e9; color: #2e7d32; }
-.badge-orange { background: #fff3e0; color: #e65100; }
+table { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 500px; }
+th { background: var(--paper); color: var(--ink-faint); padding: 10px 10px; text-align: left; font-weight: 500; white-space: nowrap; border-bottom: 2px solid var(--accent); font-size: 0.7rem; letter-spacing: 0.03em; text-transform: uppercase; }
+td { padding: 9px 10px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; color: var(--ink); }
+tr:hover td { background: var(--canvas); }
+.badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 0.72rem; font-weight: 500; background: var(--accent-soft); color: var(--ink-soft); }
+.badge-green { background: var(--accent-soft); color: var(--accent-dark); }
+.badge-orange { background: #faeee9; color: var(--warn); }
 
 /* テーブル行内プルダウン */
-.row-drill { padding: 4px 8px; border: 1px solid #c5cae9; border-radius: 5px; font-size: 0.78rem; background: #f0f4ff; color: #3949ab; cursor: pointer; }
-.row-drill:hover { background: #e8eaf6; }
+.row-drill { padding: 4px 8px; border: 1px solid var(--line); border-radius: 2px; font-size: 0.76rem; background: var(--paper); color: var(--ink-soft); cursor: pointer; }
+.row-drill:hover { border-color: var(--accent); }
 
-.chart-wrap { position: relative; height: 300px; margin: 10px 0 20px; }
-.chart-wrap-lg { height: 360px; }
-.sep { border: none; border-top: 1px solid #eee; margin: 20px 0; }
-.empty { text-align: center; color: #bbb; padding: 36px; }
+.chart-wrap { position: relative; height: 290px; margin: 10px 0 24px; }
+.chart-wrap-lg { height: 350px; }
+.sep { border: none; border-top: 1px solid var(--line-soft); margin: 28px 0; }
+.empty { text-align: center; color: var(--ink-faint); padding: 48px; font-size: 0.85rem; }
 
-
-.highlight { color: #e53935; font-weight: 700; }
-.good { color: #2e7d32; font-weight: 700; }
+.highlight { color: var(--accent-dark); font-weight: 600; }
+.good { color: var(--ink-soft); font-weight: 500; }
 
 /* 平日/休日カード */
-.daycat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
-.daycat-card { border-radius: 10px; padding: 14px; border: 1.5px solid; }
-.daycat-card.weekday { background: #e3f2fd; border-color: #90caf9; }
-.daycat-card.holiday { background: #fce4ec; border-color: #f48fb1; }
-.daycat-card h4 { font-size: 0.85rem; margin-bottom: 10px; }
-.daycat-stat { display: flex; justify-content: space-between; font-size: 0.82rem; padding: 3px 0; border-bottom: 1px solid rgba(0,0,0,0.06); }
+.daycat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 14px 0; background: var(--line); border: 1px solid var(--line); }
+.daycat-card { padding: 18px; background: var(--paper); }
+.daycat-card h4 { font-size: 0.78rem; margin-bottom: 12px; font-weight: 600; color: var(--ink-soft); letter-spacing: 0.02em; text-transform: uppercase; }
+.daycat-stat { display: flex; justify-content: space-between; font-size: 0.8rem; padding: 5px 0; border-bottom: 1px solid var(--line-soft); color: var(--ink); }
 .daycat-stat:last-child { border-bottom: none; }
-.daycat-val { font-weight: 700; }
+.daycat-val { font-weight: 600; }
 </style>
 </head>
 <body>
 
 <header>
-  <span style="font-size:1.5rem">🏮</span>
+  <span class="mark"></span>
   <h1>施設別獲得数管理</h1>
 </header>
 
 <!-- 共通フィルターバー -->
 <div class="global-filter">
-  <div class="gf-group"><label>🔍 フリー検索</label><input id="gf-search" type="text" placeholder="企画・エリア・ロケーション…" oninput="applyGlobalFilter()"></div>
+  <div class="gf-group"><label>フリー検索</label><input id="gf-search" type="text" placeholder="企画・エリア・ロケーション…" oninput="applyGlobalFilter()"></div>
   <div class="gf-group"><label>企画</label><select id="gf-event" onchange="applyGlobalFilter()"><option value="">すべて</option></select></div>
   <div class="gf-group"><label>エリア</label><select id="gf-area" onchange="applyGlobalFilter()"><option value="">すべて</option></select></div>
   <div class="gf-group"><label>ロケーション</label><select id="gf-loc" onchange="applyGlobalFilter()"><option value="">すべて</option></select></div>
@@ -152,24 +173,24 @@ tr:hover td { background: #fafbff; }
 
 <div class="container">
   <div class="tabs">
-    <button class="tab active" onclick="switchTab('upload')">📂 データ読み込み</button>
-    <button class="tab" onclick="switchTab('list')">📋 一覧</button>
-    <button class="tab" onclick="switchTab('analytics')">📊 集計・グラフ</button>
-    <button class="tab" onclick="switchTab('selected')">🎯 選択した施設 <span id="selected-badge" style="display:none;background:#e53935;color:white;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px">0</span></button>
+    <button class="tab active" onclick="switchTab('upload')">データ読み込み</button>
+    <button class="tab" onclick="switchTab('list')">一覧</button>
+    <button class="tab" onclick="switchTab('analytics')">集計・グラフ</button>
+    <button class="tab" onclick="switchTab('selected')">選択した施設 <span id="selected-badge" style="display:none;background:#1a1a1a;color:white;border-radius:9px;padding:1px 7px;font-size:0.68rem;margin-left:4px;font-weight:600">0</span></button>
   </div>
 
   <!-- データ読み込み -->
   <div class="panel active" id="tab-upload">
     <h2>データ読み込み</h2>
 
-    <div style="background:#f8f9ff;border:1.5px solid #c5cae9;border-radius:10px;padding:18px;margin-bottom:16px">
-      <h3 style="margin-top:0;margin-bottom:12px">📊 Googleスプレッドシートから読み込み</h3>
-      <button class="btn btn-primary" onclick="loadFromSheet()">📥 最新データを読み込む</button>
-      <p style="font-size:0.78rem;color:#999;margin-top:10px">スプレッドシートのデータを更新したら、このボタンで再読み込みしてください。</p>
+    <div style="background:var(--canvas);border:1px solid var(--line);padding:20px;margin-bottom:18px">
+      <h3 style="margin-top:0;margin-bottom:12px">Googleスプレッドシートから読み込み</h3>
+      <button class="btn btn-primary" onclick="loadFromSheet()">最新データを読み込む</button>
+      <p style="font-size:0.78rem;color:var(--ink-faint);margin-top:12px">スプレッドシートのデータを更新したら、このボタンで再読み込みしてください。</p>
     </div>
 
     <hr class="sep">
-    <h3 style="margin-bottom:12px">📁 CSVファイルから読み込み</h3>
+    <h3 style="margin-bottom:14px">CSVファイルから読み込み</h3>
     <div class="format-hint">
       対応フォーマット（1行目はヘッダー）：<br>
       <code>企画</code>　<code>日付</code>　<code>曜日</code>　<code>日カテゴリ</code>　<code>エリア</code>　<code>ロケーション</code>　<code>内ロケ</code>　<code>稼働人数</code>　<code>獲得数</code>　<code>個人Ave</code><br>
@@ -227,7 +248,7 @@ tr:hover td { background: #fafbff; }
 
   <!-- 選択した施設 -->
   <div class="panel" id="tab-selected">
-    <h2>🎯 選択した施設</h2>
+    <h2>選択した施設</h2>
     <div id="selected-list-area"></div>
 
     <hr class="sep">
@@ -237,7 +258,7 @@ tr:hover td { background: #fafbff; }
         <label>企画</label>
         <select id="analysis-event"><option value="">企画を選択してください</option></select>
       </div>
-      <button class="btn btn-primary" onclick="runAnalysis()">🔍 分析</button>
+      <button class="btn btn-primary" onclick="runAnalysis()">分析</button>
       <button class="btn btn-secondary btn-sm" onclick="clearSelected()">選択をクリア</button>
     </div>
 
@@ -369,7 +390,7 @@ function aggStats(rows){
   const days=unique(rows.map(r=>r.date)).length;
   return{total,staff,ave,count:rows.length,maxGet:Math.max(...rows.map(r=>r.get)),minGet:Math.min(...rows.map(r=>r.get)),days};
 }
-function hsl(i,n){return`hsl(${210+i*(150/Math.max(n,1))},65%,55%)`;}
+function hsl(i,n){const t=n>1?i/(n-1):0;const light=72-t*42;return`hsl(150,22%,${light}%)`;}
 function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
 function makeBarChart(id,labels,datasets,yLabel='',refLine=null){
   destroyChart(id);
@@ -505,7 +526,7 @@ function renderAnalytics(){
   const colors=keys.map((_,i)=>hsl(i,keys.length));
   makeBarChart('chart-avg',keys,[{label:'個人Ave',data:avgs,backgroundColor:colors,borderRadius:5}],'個人Ave（件/人）');
   makeBarChart('chart-total',keys,[{label:'合計獲得数',data:totals,backgroundColor:colors,borderRadius:5}],'獲得数（件）');
-  makeBarChart('chart-staff',keys,[{label:'稼働人数',data:staffs,backgroundColor:'#90caf9',borderRadius:5},{label:'獲得数',data:totals,backgroundColor:'#ef9a9a',borderRadius:5}]);
+  makeBarChart('chart-staff',keys,[{label:'稼働人数',data:staffs,backgroundColor:'#c7d6cb',borderRadius:2},{label:'獲得数',data:totals,backgroundColor:'#2f4f3a',borderRadius:2}]);
 
   // 詳細テーブル
   const axisLabel={event:'企画',area:'エリア',location:'ロケーション',inner:'内ロケ',dow:'曜日',daycat:'日カテゴリ'};
@@ -750,8 +771,8 @@ async function runAnalysis(){
     <hr class="sep">
     <div id="ai-comment-area">
       <div style="text-align:center;padding:24px;color:#999">
-        <span style="font-size:1.4rem">🤖</span><br>
-        <span style="font-size:0.9rem">AI考察を生成中...</span>
+        
+        <span style="font-size:0.82rem;color:var(--ink-faint)">AI考察を生成中…</span>
       </div>
     </div>`;
 
@@ -822,14 +843,14 @@ ${unimplRows.length>0?`4. **未実施施設への推奨**：${unimplRows.map(d=>
       .replace(/\n/g,'<br>')
       .replace(/^/,'<p>').replace(/$/,'</p>');
     document.getElementById('ai-comment-area').innerHTML = `
-      <div style="background:#f0f4ff;border:1.5px solid #c5cae9;border-radius:10px;padding:18px">
-        <h3 style="margin-top:0;margin-bottom:12px">🤖 AI考察コメント</h3>
-        <div style="font-size:0.88rem;line-height:1.8;color:#333">${html}</div>
+      <div style="background:var(--canvas);border:1px solid var(--line);border-left:2px solid var(--ink);padding:20px">
+        <h3 style="margin-top:0;margin-bottom:14px">AI考察コメント</h3>
+        <div style="font-size:0.86rem;line-height:1.8;color:var(--ink)">${html}</div>
       </div>`;
   } catch(e) {
     document.getElementById('ai-comment-area').innerHTML = `
-      <div style="background:#ffebee;border:1px solid #ef9a9a;border-radius:8px;padding:14px;font-size:0.85rem;color:#c62828">
-        ❌ AI考察の取得に失敗しました：${e.message}
+      <div style="background:#faeee9;border:1px solid #e0b5a3;padding:14px;font-size:0.85rem;color:#b5482c">
+        AI考察の取得に失敗しました：${e.message}
       </div>`;
   }
 }
