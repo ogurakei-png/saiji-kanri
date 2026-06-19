@@ -688,7 +688,6 @@ function renderSelectedTab(){
 }
 
 // ===== 分析実行（AI考察付き） =====
-const ANTHROPIC_API_KEY = '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';
 
 async function runAnalysis(){
   const event = document.getElementById('analysis-event').value;
@@ -803,13 +802,10 @@ ${unimplRows.length>0?`4. **未実施施設への推奨**：${unimplRows.map(d=>
 数値を引用しながら、実践的なアドバイスを簡潔にまとめてください。`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/analyze', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'interleaved-thinking-2025-05-14'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
